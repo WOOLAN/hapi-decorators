@@ -28,8 +28,8 @@ export interface IDecoratorConfig {
 }
 
 export interface IPayload {
-    type?: string;
-    output?: string;
+    type?: 'json' | 'form';
+    output?: 'data' | 'stream' | 'file';
     parse?: boolean;
     validate?: Joi.Schema;
 }
@@ -49,22 +49,17 @@ function isPayload(payload: any): payload is IPayload {
 export function Controller(path: string = '') {
     return function(constructor: any) {
         let routes: any[] = Reflect.getMetadata('hapi:routes', constructor);
-        let apiPath = '/api' + path;
 
         constructor.prototype.routes = function() {
             if (routes) {
                 for (let i: number = 0; i < routes.length; ++i) {
-                    if (routes[i].config.tags) {
-                        routes[i].path = apiPath + routes[i].path;
-                    } else {
-                        routes[i].path = path + routes[i].path;
-                    }
-
+                    routes[i].path = path + routes[i].path;
                     routes[i].config.bind = this;
                 }
             } else {
                 routes = [];
             }
+
             return routes;
         };
     };
@@ -83,45 +78,44 @@ export function Route(config: IDecoratorConfig) {
             method: config.method,
             path: config.path,
             handler: fn,
-            config: {}
-        };
-
-        if (config.tags && Array.isArray(config.tags) && config.tags.length > 0) {
-            handler.config = {
+            config: {
                 description: config.description || null,
                 notes: config.notes || null,
-                tags: config.tags,
+                tags: config.tags || [],
                 auth: config.auth === undefined ? null : config.auth,
-                plugins: {
-                    'hapi-swagger': {
-                        responses: config.responses || null,
-                        produces: config.produces || null,
-                        consumes: config.consumes || null,
-                        security: config.security || null
-                    }
-                },
                 validate: {
                     query: config.query || null,
                     params: config.params || null
                 }
-            };
-
-            let payload = config.payload;
-
-            if (isPayload(payload)) {
-                handler.config.plugins['hapi-swagger'].payloadType = payload.type || null;
-
-                if (payload.output || payload.parse !== undefined) {
-                    handler.config.payload = {
-                        output: payload.output || null,
-                        parse: payload.parse || null
-                    };
-                }
-
-                handler.config.validate.payload = payload.validate || null;
-            } else {
-                handler.config.validate.payload = payload || null;
             }
+        };
+
+        if (handler.config.tags.indexOf('api') >= 0) {
+            handler.config.plugins = {
+                'hapi-swagger': {
+                    responses: config.responses || null,
+                    produces: config.produces || null,
+                    consumes: config.consumes || null,
+                    security: config.security || null
+                }
+            };
+        }
+
+        if (isPayload(config.payload)) {
+            if (handler.config.tags.indexOf('api') >= 0) {
+                handler.config.plugins['hapi-swagger'].payloadType = config.payload.type || null;
+            }
+
+            if (config.payload.output || config.payload.parse !== undefined) {
+                handler.config.payload = {
+                    output: config.payload.output || null,
+                    parse: config.payload.parse || null
+                };
+            }
+
+            handler.config.validate.payload = config.payload.validate || null;
+        } else {
+            handler.config.validate.payload = config.payload || null;
         }
 
         routes.push(handler);
