@@ -1,6 +1,6 @@
 {
   "name": "@woolan/hapi-decorators",
-  "version": "0.0.6",
+  "version": "1.0.0",
   "description": "Decorators for hapi.js",
   "author": {
     "name": "Fredrik Ullner",
